@@ -1,0 +1,134 @@
+/* * =======================================================
+ * WATERMARK: PROPERTY OF ALEX X GAMES (C) 2026
+ * PROJECT: CHRONO-OPS (MOBILE PORT)
+ * MODULE: MOBILE OPTIMIZATION & TOUCH INTERACTION ENGINE
+ * =======================================================
+ */
+
+using UnityEngine;
+using UnityEngine.Rendering;
+
+public class ChronoMobileController : MonoBehaviour
+{
+    [Header("--- Mobile Touch Input ---")]
+    public RectTransform movementTouchZone;
+    public RectTransform lookTouchZone;
+    public float mobileLookSensitivity = 0.2f;
+    
+    private Vector2 moveInput = Vector2.zero;
+    private Vector2 lookInput = Vector2.zero;
+    private int moveFingerId = -1;
+    private int lookFingerId = -1;
+
+    [Header("--- Mobile Performance Optimization ---")]
+    [Tooltip("Target frame rate for smooth mobile gameplay (60fps).")]
+    public int targetFrameRate = 60;
+    [Tooltip("Lowering scale slightly drastically boosts mobile performance on high-res displays.")]
+    [Range(0.7f, 1.0f)] public float mobileRenderScale = 0.85f;
+
+    void Awake()
+    {
+        // 1. Optimize Mobile Engine Settings
+        Application.targetFrameRate = targetFrameRate;
+        
+        // Force aggressive mobile memory and GPU optimization
+        QualitySettings.vSyncCount = 0; // Off on mobile to save battery
+        QualitySettings.masterTextureLimit = 1; // Downscales textures slightly for mobile VRAM saving
+        
+#if UNITY_ANDROID || UNITY_IOS
+        // Set dynamic resolution scale for mobile devices to prevent thermal throttling
+        UnityEngine.XR.XRSettings.renderViewportScale = mobileRenderScale;
+#endif
+        Debug.Log("[ALEX X GAMES] Mobile Performance Matrix Initialized Successfully.");
+    }
+
+    void Update()
+    {
+        HandleMobileTouchInputs();
+    }
+
+    /// <summary>
+    /// Processes physical multi-touch finger inputs optimized for mobile shooters.
+    /// </summary>
+    private void HandleMobileTouchInputs()
+    {
+        // Loop through all fingers touching the screen
+        for (int i = 0; i < Input.touchCount; i++)
+        {
+            Touch touch = Input.GetTouch(i);
+
+            switch (touch.phase)
+            {
+                case TouchPhase.Began:
+                    // Check if the touch is on the left half of the screen (Movement)
+                    if (touch.position.x < Screen.width / 2f && moveFingerId == -1)
+                    {
+                        moveFingerId = touch.fingerId;
+                    }
+                    // Check if the touch is on the right half of the screen (Looking/Aiming)
+                    else if (touch.position.x >= Screen.width / 2f && lookFingerId == -1)
+                    {
+                        lookFingerId = touch.fingerId;
+                    }
+                    break;
+
+                case TouchPhase.Moved:
+                    if (touch.fingerId == moveFingerId)
+                    {
+                        moveInput = touch.deltaPosition.normalized;
+                    }
+                    else if (touch.fingerId == lookFingerId)
+                    {
+                        lookInput = touch.deltaPosition * mobileLookSensitivity;
+                    }
+                    break;
+
+                case TouchPhase.Stationary:
+                    if (touch.fingerId == lookFingerId)
+                    {
+                        lookInput = Vector2.zero;
+                    }
+                    break;
+
+                case TouchPhase.Ended:
+                case TouchPhase.Clipped:
+                    if (touch.fingerId == moveFingerId)
+                    {
+                        moveFingerId = -1;
+                        moveInput = Vector2.zero;
+                    }
+                    else if (touch.fingerId == lookFingerId)
+                    {
+                        lookFingerId = -1;
+                        lookInput = Vector2.zero;
+                    }
+                    break;
+            }
+        }
+    }
+
+    // Public Getters so your Player Movement script can read mobile inputs seamlessly
+    public Vector2 GetMobileMoveInput() => moveInput;
+    public Vector2 GetMobileLookInput() => lookInput;
+
+    /// <summary>
+    /// Realism Adjustments for Mobile Hardware profiles.
+    /// Swaps out heavy shaders for fast mobile lookup textures (LUT).
+    /// </summary>
+    public void OptimizeRealismForMobile(Volume mobileVolume, Texture2D eraLUT)
+    {
+        // Instead of calculating heavy camera color adjustments per-pixel every frame (which kills mobile batteries),
+        // we bake the realism colors into a Look-Up Texture (LUT) map and apply it instantly.
+        if (mobileVolume.profile.TryGet<UnityEngine.Rendering.Universal.ColorLookup>(out var cl))
+        {
+            cl.texture.Override(eraLUT);
+            cl.contribution.Override(1.0f);
+            Debug.Log("[ALEX X GAMES] Applied mobile-optimized realism LUT successfully.");
+        }
+    }
+}
+
+/* * =======================================================
+ * WATERMARK: PROPERTY OF ALEX X GAMES (C) 2026
+ * =======================================================
+ */
